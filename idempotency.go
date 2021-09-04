@@ -18,16 +18,21 @@ type state struct {
 }
 
 type Instance interface {
+	GetKey() string
 	CheckAndSet(ctx context.Context, idemKey string) error
 	DeleteIdempotencyKey(ctx context.Context, idemKey string) error
 }
 
-func NewInstance(client *redis.Client, prefix string, key string) *state {
+func NewInstance(client *redis.Client, prefix string, key string) Instance {
 	return &state{
 		client: client,
 		Prefix: prefix,
 		Key:    key,
 	}
+}
+
+func (str *state) GetKey() string {
+	return str.Key
 }
 
 func (str *state) DeleteIdempotencyKey(ctx context.Context, idemKey string) error {

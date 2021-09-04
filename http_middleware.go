@@ -28,11 +28,11 @@ func (w *httpWriter) Write(b []byte) (int, error) {
 	return w.ResponseWriter.Write(b)
 }
 
-func HTTPMiddleware(state *state) func(next http.HandlerFunc) http.HandlerFunc {
+func HTTPMiddleware(state Instance) func(next http.HandlerFunc) http.HandlerFunc {
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
-			idemKey := r.Header.Get(state.Key)
+			idemKey := r.Header.Get(state.GetKey())
 			if len(idemKey) == 0 {
 				next(w, r)
 				return
