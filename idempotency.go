@@ -1,4 +1,4 @@
-package go_idempotent
+package idempotency
 
 import (
 	"context"
@@ -13,8 +13,8 @@ var (
 
 type state struct {
 	client *redis.Client
-	prefix string
-	key    string
+	Prefix string
+	Key    string
 }
 
 type Instance interface {
@@ -25,18 +25,18 @@ type Instance interface {
 func NewInstance(client *redis.Client, prefix string, key string) *state {
 	return &state{
 		client: client,
-		prefix: prefix,
-		key:    key,
+		Prefix: prefix,
+		Key:    key,
 	}
 }
 
 func (str *state) DeleteIdempotencyKey(ctx context.Context, idemKey string) error {
-	key := getRedisKey(str.prefix, idemKey)
+	key := getRedisKey(str.Prefix, idemKey)
 	return str.client.Del(ctx, key).Err()
 }
 
 func (str *state) CheckAndSet(ctx context.Context, idemKey string) error {
-	key := getRedisKey(str.prefix, idemKey)
+	key := getRedisKey(str.Prefix, idemKey)
 	scr := redis.NewScript(`
 				if redis.call("EXISTS", KEYS[1]) == 1 then
 					return "1"

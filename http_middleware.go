@@ -1,4 +1,4 @@
-package go_idempotent
+package idempotency
 
 import (
 	"context"
@@ -17,7 +17,7 @@ type httpWriter struct {
 func (w *httpWriter) WriteHeader(status int) {
 	if status >= http.StatusBadRequest {
 		if err := w.Instance.DeleteIdempotencyKey(w.ctx, w.idemKey); err != nil {
-			log.Print("Couldn't delete the idempotent key")
+			log.Print("Couldn't delete the idempotent Key")
 		}
 	}
 
@@ -32,7 +32,7 @@ func HTTPMiddleware(state *state) func(next http.HandlerFunc) http.HandlerFunc {
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
-			idemKey := r.Header.Get(state.key)
+			idemKey := r.Header.Get(state.Key)
 			if len(idemKey) == 0 {
 				next(w, r)
 				return
