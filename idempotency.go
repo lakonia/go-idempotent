@@ -5,64 +5,87 @@ import (
 	"fmt"
 	"github.com/go-redis/redis/v8"
 	"github.com/pkg/errors"
+	"time"
+)
+
+const (
+	defaultExpiry = 60 * time.Second
+	defaultPrefix = "I"
 )
 
 var (
-	ErrKeyExists = errors.New("Key Exists")
+	ErrKeyAlreadyExists = errors.New("Key Exists")
 )
 
 type state struct {
 	client *redis.Client
-	Prefix string
-	Key    string
+	prefix string
+	expiry time.Duration
 }
 
+type configFn func(*state)
+
 type Instance interface {
-	GetKey() string
 	CheckAndSet(ctx context.Context, idemKey string) error
 	DeleteIdempotencyKey(ctx context.Context, idemKey string) error
 }
 
-func NewInstance(client *redis.Client, prefix string, key string) Instance {
-	return &state{
+func NewInstance(client *redis.Client, configFns ...configFn) Instance {
+	s := &state{
 		client: client,
-		Prefix: prefix,
-		Key:    key,
+		expiry: defaultExpiry,
+		prefix: defaultPrefix,
+	}
+
+	for _, fn := range configFns {
+		fn(s)
+	}
+
+	return s
+}
+
+func NoPrefix() configFn {
+	return func(state *state) {
+		state.prefix = ""
 	}
 }
 
-func (str *state) GetKey() string {
-	return str.Key
+func SetPrefix(prefix string) configFn {
+	return func(state *state) {
+		state.prefix = prefix
+	}
+}
+
+func SetExpiry(expiry time.Duration) configFn {
+	return func(state *state) {
+		state.expiry = expiry
+	}
 }
 
 func (str *state) DeleteIdempotencyKey(ctx context.Context, idemKey string) error {
-	key := getRedisKey(str.Prefix, idemKey)
+	key := str.getRedisKey(idemKey)
 	return str.client.Del(ctx, key).Err()
 }
 
 func (str *state) CheckAndSet(ctx context.Context, idemKey string) error {
-	key := getRedisKey(str.Prefix, idemKey)
-	scr := redis.NewScript(`
-				if redis.call("EXISTS", KEYS[1]) == 1 then
-					return "1"
-				end
-				redis.call("SET", KEYS[1], 1)
-				redis.call("EXPIRE", KEYS[1], ARGV[1])
-				return "0"
-			`)
+	key := str.getRedisKey(idemKey)
 
-	c, err := scr.Run(ctx, str.client, []string{key}, 60).Result()
+	res, err := str.client.SetNX(ctx, key, 1, str.expiry).Result()
 	if err != nil {
-		return errors.Wrap(err, "Couldn't run the lua script")
+		return errors.Wrap(err, "Error while connecting to redis")
 	}
 
-	if c.(string) == "1" {
-		return ErrKeyExists
+	if res == false {
+		return ErrKeyAlreadyExists
 	}
 
 	return nil
 }
 
-func getRedisKey(prefix, key string) string {
-	return fmt.Sprintf("%s:%s", prefix, key)
+func (str *state) getRedisKey(idemKey string) string {
+	if len(str.prefix) > 0 {
+		return fmt.Sprintf("%s:%s", str.prefix, idemKey)
+	}
+
+	return idemKey
 }

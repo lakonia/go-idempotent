@@ -28,11 +28,11 @@ func (w *httpWriter) Write(b []byte) (int, error) {
 	return w.ResponseWriter.Write(b)
 }
 
-func HTTPMiddleware(state Instance) func(next http.HandlerFunc) http.HandlerFunc {
+func HTTPMiddleware(state Instance, headerName string) func(next http.HandlerFunc) http.HandlerFunc {
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
-			idemKey := r.Header.Get(state.GetKey())
+			idemKey := r.Header.Get(headerName)
 			if len(idemKey) == 0 {
 				next(w, r)
 				return
@@ -41,7 +41,7 @@ func HTTPMiddleware(state Instance) func(next http.HandlerFunc) http.HandlerFunc
 			dw := &httpWriter{ResponseWriter: w, Instance: state, idemKey: idemKey, ctx: ctx}
 			err := state.CheckAndSet(ctx, idemKey)
 
-			if err == ErrKeyExists {
+			if err == ErrKeyAlreadyExists {
 				w.WriteHeader(http.StatusConflict)
 				return
 			}
