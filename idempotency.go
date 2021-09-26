@@ -64,13 +64,13 @@ func SetExpiry(expiry time.Duration) configFn {
 
 func (str *state) DeleteIdempotencyKey(ctx context.Context, idemKey string) error {
 	key := str.getRedisKey(idemKey)
-	return str.client.Del(ctx, key).Err()
+	return str.client.WithContext(ctx).Del(ctx, key).Err()
 }
 
 func (str *state) CheckAndSet(ctx context.Context, idemKey string) error {
 	key := str.getRedisKey(idemKey)
 
-	res, err := str.client.SetNX(ctx, key, 1, str.expiry).Result()
+	res, err := str.client.WithContext(ctx).SetNX(ctx, key, 1, str.expiry).Result()
 	if err != nil {
 		return errors.Wrap(err, "Error while connecting to redis")
 	}
